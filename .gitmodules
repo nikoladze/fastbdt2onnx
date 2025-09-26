@@ -1,0 +1,3 @@
+[submodule "FastBDT"]
+	path = FastBDT
+	url = https://github.com/nikoladze/FastBDT.git

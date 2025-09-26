@@ -1,0 +1,31 @@
+[project]
+name = "fastbdt-to-onnx"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.3.3",
+    "onnx>=1.19.0",
+    "onnxruntime>=1.23.0",
+    "pyfastbdt",
+]
+
+[dependency-groups]
+jupyter = [
+    "jupyter>=1.1.1",
+    "jupytext>=1.17.3",
+    "matplotlib>=3.10.6",
+    "netron>=8.6.5",
+]
+
+[tool.uv.sources]
+pyfastbdt = { path = "FastBDT", editable = true }
+
+[tool.uv.workspace]
+exclude = [
+    "FastBDT",
+]
+members = [
+    "FastBDT",
+]

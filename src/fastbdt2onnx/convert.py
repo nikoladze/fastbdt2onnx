@@ -1,3 +1,4 @@
+import argparse
 import io
 from pathlib import Path
 from typing import IO
@@ -235,3 +236,16 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
         nodes_splits=nodes_splits,
         tree_roots=tree_roots,
     )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("fastbdt_textfile")
+    parser.add_argument("onnx_outputfile")
+    args = parser.parse_args()
+    model = convert(args.fastbdt_textfile)
+    onnx.save(model, args.onnx_outputfile)
+
+
+if __name__ == "__main__":
+    main()

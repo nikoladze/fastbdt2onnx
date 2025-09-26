@@ -1,4 +1,4 @@
-# Development Setup
+# Development Setup (only needed for tests)
 
 ``` bash
 git submodule init

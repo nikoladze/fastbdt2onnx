@@ -1,5 +1,7 @@
 > **Note**
 > This is in an early stage and currently only tested against one example model - please validate the resulting ONNX models 
+> **Note**
+> NaN input values are currently not treated correctly yet
 
 # Example usage
 Either via command line tool `fastbdt2onnx`, e.g. using [uvx](https://docs.astral.sh/uv/concepts/tools/#the-uv-tool-interface):

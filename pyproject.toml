@@ -8,7 +8,6 @@ dependencies = [
     "numpy>=2.3.3",
     "onnx>=1.19.0",
     "onnxruntime>=1.23.0",
-    "pyfastbdt",
 ]
 
 [build-system]
@@ -26,7 +25,8 @@ jupyter = [
     "netron>=8.6.5",
 ]
 test = [
-    "pytest>=8.4.2",
+     "pytest>=8.4.2",
+     "pyfastbdt",
 ]
 
 [tool.uv.sources]

@@ -7,7 +7,8 @@ from fastbdt2onnx import convert
 from fastbdt2onnx.bdt import BDT
 
 
-def test_consistent_fastbdt_onnx():
+@pytest.mark.parametrize("use_nan", [True, False], ids=["with_nan", "no_nan"])
+def test_consistent_fastbdt_onnx(use_nan):
     rng = np.random.default_rng(42)
     with open("data/FastBDTv5.txt") as f:
         bdt = BDT.from_file(f)
@@ -25,6 +26,8 @@ def test_consistent_fastbdt_onnx():
     stops = [np.nanmax(s).item() + 0.1 for s in splittings]
     x = rng.uniform(starts, stops, size=(10000, bdt.numberOfFeatures))
     x = x.astype(np.float32)
+    if use_nan:
+        x[rng.random(x.shape) < 0.05] = np.nan
     sess = ort.InferenceSession(model.SerializeToString())
     out_onnx = sess.run(None, {"input": x})[0].ravel().tolist()
     clf = Classifier()

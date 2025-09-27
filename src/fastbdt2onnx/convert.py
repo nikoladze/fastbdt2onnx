@@ -118,38 +118,14 @@ def _to_onnx(
         leaf_targetids=leaf_targetids,
         leaf_weights=_to_tensor(TensorProto.FLOAT, leaf_weights=leaf_weights),
     )
-    f0 = make_node(
-        "Constant",
-        inputs=[],
-        outputs=["f0"],
-        value=_to_tensor(TensorProto.FLOAT, F0=[bdt.forest.f0]),
-    )
-    add_f0 = make_node(
-        "Add",
-        inputs=["forest", "f0"],
-        outputs=["add_f0"],
-        name="AddF0",
-    )
-    two = make_node(
-        "Constant",
-        inputs=[],
-        outputs=["two"],
-        value=_to_tensor(TensorProto.FLOAT, TWO=[2]),
-    )
-    twice = make_node(
-        "Mul",
-        inputs=["add_f0", "two"],
-        outputs=["twice"],
-        name="Twice",
-    )
     sigmoid = make_node(
         "Sigmoid",
-        inputs=["twice"],
+        inputs=["forest"],
         outputs=["output"],
         name="Sigmoid",
     )
     graph = make_graph(
-        [forest, f0, add_f0, two, twice, sigmoid],
+        [forest, sigmoid],
         "FastBDT",
         [
             make_tensor_value_info(
@@ -200,6 +176,7 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
 
     node_offset = 0
     leaf_offset = 0
+    f0 = bdt.forest.f0
     for tree in bdt.forest.trees:
         tree_roots.append(node_offset)
         for node, cut in enumerate(tree.cuts):
@@ -223,7 +200,13 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
             nodes_splits.append(cut.index)
         node_offset += len(tree.cuts)
         leaf_offset += len(tree.boost_weights)
-        leaf_weights += [w * bdt.shrinkage for w in tree.boost_weights]
+        # factor in shrinkage and factor of 2 used in FastBDT pre-sigmoid
+        weights = [w * bdt.shrinkage * 2 for w in tree.boost_weights]
+        if f0:
+            # add f0 (also with factor of 2) to first tree
+            weights = [w + 2 * f0 for w in weights]
+            f0 = None
+        leaf_weights.extend(weights)
 
     return _to_onnx(
         bdt,

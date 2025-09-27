@@ -103,7 +103,7 @@ def _to_onnx(
         domain="ai.onnx.ml",
         n_targets=1,
         membership_values=None,
-        nodes_missing_value_tracks_true=None,
+        nodes_missing_value_tracks_true=[1 for __ in nodes_splits],
         nodes_hitrates=None,
         aggregate_function=AggregateFunction.SUM,
         post_transform=post_transform,
@@ -179,26 +179,44 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
     f0 = bdt.forest.f0
     for tree in bdt.forest.trees:
         tree_roots.append(node_offset)
+
+        # we loop over non-duplicated node indices
+        # so at various places factors of 2 appear
         for node, cut in enumerate(tree.cuts):
             is_terminal = node >= n_internal_nodes
+
+            # add the NaN node:
+            # non-NaN values will go to the false branch, which is then the
+            # actual node. NaN values will go to the true branch since we will
+            # set `nodes_missing_value_tracks_true` for all nodes
+            nodes_trueleafs.append(1)
+            nodes_falseleafs.append(0)
+            # NaNs go to leaf with same index as node (in non-duplicated index space)
+            nodes_truenodeids.append(node + leaf_offset)
+            # The rest goes to the next actual node (we need to multiply by 2)
+            nodes_falsenodeids.append(2 * node + 1 + node_offset)
+            # Splitting on NaN ensures all non-NaN values go to false
+            nodes_splits.append(float("nan"))
+            nodes_featureids.append(cut.feature)
+
             if (not cut.valid) or is_terminal:
                 nodes_falseleafs.append(1)
                 nodes_trueleafs.append(1)
                 if cut.valid:
                     # same index as for non-terminal, but index into leafs, so with leaf offset
-                    nodes_falsenodeids.append(2 * (node + 1) + leaf_offset - 1)
-                    nodes_truenodeids.append(2 * (node + 1) + 1 + leaf_offset - 1)
+                    nodes_falsenodeids.append(2 * (node + 1) - 1 + leaf_offset)
+                    nodes_truenodeids.append(2 * (node + 1) + leaf_offset)
                 else:
                     nodes_falsenodeids.append(node + leaf_offset)
                     nodes_truenodeids.append(node + leaf_offset)
             else:
                 nodes_falseleafs.append(0)
                 nodes_trueleafs.append(0)
-                nodes_falsenodeids.append(2 * (node + 1) + node_offset - 1)
-                nodes_truenodeids.append(2 * (node + 1) + 1 + node_offset - 1)
+                nodes_falsenodeids.append(2 * (2 * (node + 1) - 1) + node_offset)
+                nodes_truenodeids.append(2 * (2 * (node + 1)) + node_offset)
             nodes_featureids.append(cut.feature)
             nodes_splits.append(cut.index)
-        node_offset += len(tree.cuts)
+        node_offset += 2 * len(tree.cuts)
         leaf_offset += len(tree.boost_weights)
         # factor in shrinkage and factor of 2 used in FastBDT pre-sigmoid
         weights = [w * bdt.shrinkage * 2 for w in tree.boost_weights]

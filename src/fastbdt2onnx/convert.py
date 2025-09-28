@@ -91,8 +91,10 @@ def _to_onnx(
     nodes_featureids,
     nodes_splits,
     tree_roots,
-    # this is just metadata, we still have to add a sigmoid node
-    post_transform=PostTransform.LOGISTIC,
+    # post transform seems to be ignored for 1-class outputs
+    # (https://github.com/microsoft/onnxruntime/issues/24862)
+    # so we apply sigmoid manually later
+    post_transform=PostTransform.NONE,
 ):
     nodes_modes = [NodeMode.BRANCH_GTE for __ in nodes_splits]
     leaf_targetids = [0 for __ in leaf_weights]
@@ -152,10 +154,7 @@ def _to_onnx(
     )
 
 
-def convert(file: str | Path | IO | bytes) -> ModelProto:
-    with _read_file(file) as f:
-        bdt = BDT.from_file(f)
-
+def _get_tree_ensemble_attrs(bdt):
     # todo: proper error messages for these
     assert bdt.can_use_fast_forest
     assert bdt.transform2probability
@@ -174,8 +173,17 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
     n_terminal_nodes = n_leafs // 2
     n_internal_nodes = n_nodes - n_terminal_nodes
 
+    # work around https://github.com/microsoft/onnxruntime/issues/24679
+    # otherwise the leaf and node index of the second tree root will coincide
+    # and trigger the issue.
+    # The issue is fixed by now (https://github.com/microsoft/onnxruntime/pull/25410)
+    # so once this lands in a release the workaround may be removed eventually
+    # (start with leaf_offset = 0)
+    leaf_offset = 2
+    leaf_weights.append(float("nan"))
+    leaf_weights.append(float("nan"))
+
     node_offset = 0
-    leaf_offset = 0
     f0 = bdt.forest.f0
     for tree in bdt.forest.trees:
         tree_roots.append(node_offset)
@@ -226,8 +234,7 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
             f0 = None
         leaf_weights.extend(weights)
 
-    return _to_onnx(
-        bdt,
+    return dict(
         leaf_weights=leaf_weights,
         nodes_falseleafs=nodes_falseleafs,
         nodes_trueleafs=nodes_trueleafs,
@@ -237,6 +244,13 @@ def convert(file: str | Path | IO | bytes) -> ModelProto:
         nodes_splits=nodes_splits,
         tree_roots=tree_roots,
     )
+
+
+def convert(file: str | Path | IO | bytes) -> ModelProto:
+    with _read_file(file) as f:
+        bdt = BDT.from_file(f)
+
+    return _to_onnx(bdt, **_get_tree_ensemble_attrs(bdt))
 
 
 def main():

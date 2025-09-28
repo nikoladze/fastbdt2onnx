@@ -1,18 +1,18 @@
 import argparse
 import io
+from contextlib import contextmanager
+from enum import IntEnum
 from pathlib import Path
 from typing import IO
-from enum import IntEnum
-from contextlib import contextmanager
 
 import onnx
 from onnx import TensorProto
 from onnx.helper import (
+    make_graph,
     make_model,
     make_node,
-    make_tensor_value_info,
-    make_graph,
     make_tensor,
+    make_tensor_value_info,
 )
 from onnx.onnx_ml_pb2 import ModelProto
 
@@ -46,14 +46,8 @@ def _read_file(file: str | Path | IO | bytes) -> IO:
         )
 
 
-def _to_tensor(tensor_type, **kwargs):
-    for k, v in kwargs.items():
-        return make_tensor(
-            k,
-            tensor_type,
-            (len(v),),
-            v,
-        )
+def _tensor_1d(tensor_type, name, values):
+    return make_tensor(name, tensor_type, (len(values),), values)
 
 
 class NodeMode(IntEnum):
@@ -81,8 +75,8 @@ class AggregateFunction(IntEnum):
     MAX = 3
 
 
-def _to_onnx(
-    bdt,
+def _get_onnx_model(
+    number_of_inputs,
     leaf_weights,
     nodes_falseleafs,
     nodes_trueleafs,
@@ -110,15 +104,15 @@ def _to_onnx(
         aggregate_function=AggregateFunction.SUM,
         post_transform=post_transform,
         tree_roots=tree_roots,
-        nodes_modes=_to_tensor(TensorProto.UINT8, nodes_modes=nodes_modes),
+        nodes_modes=_tensor_1d(TensorProto.UINT8, "nodes_modes", nodes_modes),
         nodes_featureids=nodes_featureids,
-        nodes_splits=_to_tensor(TensorProto.FLOAT, nodes_splits=nodes_splits),
+        nodes_splits=_tensor_1d(TensorProto.FLOAT, "nodes_splits", nodes_splits),
         nodes_truenodeids=nodes_truenodeids,
         nodes_trueleafs=nodes_trueleafs,
         nodes_falsenodeids=nodes_falsenodeids,
         nodes_falseleafs=nodes_falseleafs,
         leaf_targetids=leaf_targetids,
-        leaf_weights=_to_tensor(TensorProto.FLOAT, leaf_weights=leaf_weights),
+        leaf_weights=_tensor_1d(TensorProto.FLOAT, "leaf_weights", leaf_weights),
     )
     sigmoid = make_node(
         "Sigmoid",
@@ -133,7 +127,7 @@ def _to_onnx(
             make_tensor_value_info(
                 "input",
                 TensorProto.FLOAT,
-                [None, bdt.numberOfFeatures],
+                [None, number_of_inputs],
             )
         ],
         [
@@ -208,22 +202,35 @@ def _get_tree_ensemble_attrs(bdt):
             nodes_featureids.append(cut.feature)
 
             if (not cut.valid) or is_terminal:
+                # go to leaf after this
                 nodes_falseleafs.append(1)
                 nodes_trueleafs.append(1)
                 if cut.valid:
-                    # same index as for non-terminal, but index into leafs, so with leaf offset
+                    # terminal node:
+                    # same index as for non-terminal, but index into leafs,
+                    # so with leaf offset and index not duplicated
                     nodes_falsenodeids.append(2 * (node + 1) - 1 + leaf_offset)
                     nodes_truenodeids.append(2 * (node + 1) + leaf_offset)
                 else:
+                    # "invalid" node, meaning tree stops here and goes to leaf
+                    # TODO: could try to optimize this by directly going to the
+                    # leaf from the node that lead use here and prune all nodes
+                    # following from here
                     nodes_falsenodeids.append(node + leaf_offset)
                     nodes_truenodeids.append(node + leaf_offset)
             else:
+                # internal node, go to next node depending on the splitting
+                # criterion we need an additional factor of 2 in the node
+                # indices since we duplicated the nodes for the NaN nodes
                 nodes_falseleafs.append(0)
                 nodes_trueleafs.append(0)
                 nodes_falsenodeids.append(2 * (2 * (node + 1) - 1) + node_offset)
                 nodes_truenodeids.append(2 * (2 * (node + 1)) + node_offset)
             nodes_featureids.append(cut.feature)
             nodes_splits.append(cut.index)
+
+        # since we have all nodes and leafs in one big list
+        # we need to count offsets up
         node_offset += 2 * len(tree.cuts)
         leaf_offset += len(tree.boost_weights)
         # factor in shrinkage and factor of 2 used in FastBDT pre-sigmoid
@@ -249,8 +256,10 @@ def _get_tree_ensemble_attrs(bdt):
 def convert(file: str | Path | IO | bytes) -> ModelProto:
     with _read_file(file) as f:
         bdt = BDT.from_file(f)
-
-    return _to_onnx(bdt, **_get_tree_ensemble_attrs(bdt))
+    return _get_onnx_model(
+        number_of_inputs=bdt.numberOfFeatures,
+        **_get_tree_ensemble_attrs(bdt),
+    )
 
 
 def main():

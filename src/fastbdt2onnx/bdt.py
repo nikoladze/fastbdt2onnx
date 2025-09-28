@@ -149,4 +149,4 @@ class BDT:
 
     @classmethod
     def from_string(cls, s):
-        return cls.from_tokens(s.split())
+        return cls.from_tokens(iter(s.split()))

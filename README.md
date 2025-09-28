@@ -54,7 +54,7 @@ The starting value `f0` in FastBDT is added to all weights of the first tree. In
 
 Up to this point the conversion is rather straightforward, but FastBDT has a special handling of NaN inputs: if a NaN value is encountered, the tree traversion is stopped and a specific output value for that node is returned.
 
-Special handling of NaN values in the `TreeEnsemble` node is supported via the `nodes_missing_value_tracks_true` attribute. With that we can specify that NaN values go to the `true` branch - together with choosing NaN as a splitting value we can build nodes that go to `false` for every non-NaN value. So we duplicate all nodes, starting with one node that first distinguishes between NaN values (directly go to a leaf) and non-NaN values (go to the actual node):
+Special handling of NaN values in the `TreeEnsemble` node is supported via the `nodes_missing_value_tracks_true` attribute. With that we can specify that NaN values go to the `true` branch - together with choosing NaN as a splitting value we can build nodes that go to `false` for every non-NaN value and `true` for NaN values. So we duplicate all nodes, starting with one node that first distinguishes between NaN values (directly go to a leaf) and non-NaN values (go to the actual node):
 
 ![](tree_with_nan_nodes.drawio.svg)
 

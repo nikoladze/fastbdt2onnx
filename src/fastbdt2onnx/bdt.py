@@ -14,15 +14,23 @@ from dataclasses import dataclass
 logger = logging.getLogger()
 
 
+def next_non_space(tokens):
+    while (token := next(tokens)).isspace():
+        continue
+    return token
+
+
 def read(tokens, conv=int):
     logger.debug(f"read {conv}")
-    return conv(next(tokens))
+    if conv is bool:
+        conv = lambda s: bool(int(s))
+    return conv(next_non_space(tokens))
 
 
 def read_vector(tokens, conv=float):
     logger.debug(f"read vector<{conv}>")
-    size = int(next(tokens))
-    return [conv(next(tokens)) for i in range(size)]
+    size = int(next_non_space(tokens))
+    return [conv(next_non_space(tokens)) for i in range(size)]
 
 
 def read_vector_feature_binning(tokens):

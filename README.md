@@ -21,6 +21,14 @@ model_proto = convert(fastbdt_textfile)
 onnx.save(model_proto, onnx_outputfile)
 ```
 
+# Implemented features
+
+- [X] Classifier with `transform2probability=true` (sigmoid transformation)
+- [ ] Regression (no transformation)
+- [X] Treatment of NaN inputs
+- [ ] Old (v1) FastBDT files
+- [ ] Inference for binned trees (`can_use_fast_forest=false`)
+
 # Development Setup (only needed for tests)
 
 ``` bash

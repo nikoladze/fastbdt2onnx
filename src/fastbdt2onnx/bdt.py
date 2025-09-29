@@ -9,6 +9,7 @@ Mainly following the code from
 """
 
 import logging
+import math
 from dataclasses import dataclass
 
 logger = logging.getLogger()
@@ -44,6 +45,23 @@ def read_vector_feature_binning(tokens):
     return out
 
 
+def write_vector(vector):
+    yield str(len(vector))
+    for x in vector:
+        if isinstance(x, bool):
+            x = int(x)
+        yield str(x)
+    yield "\n"
+
+
+def write_vector_feature_binning(vec_feature_binning):
+    yield str(len(vec_feature_binning))
+    for n_levels, binning in vec_feature_binning:
+        yield str(n_levels)
+        yield from write_vector(binning)
+    yield "\n"
+
+
 @dataclass
 class Cut:
     feature: int
@@ -59,6 +77,13 @@ class Cut:
         valid = read(tokens, int)
         gain = read(tokens, float)
         return cls(feature, index, gain, valid)
+
+    def to_tokens(self):
+        yield str(self.feature)
+        yield str(self.index)
+        yield str(self.valid)
+        yield str(self.gain)
+        yield "\n"
 
 
 @dataclass
@@ -80,12 +105,25 @@ class Tree:
         nEntries = read_vector(tokens, float)
         return cls(cuts, nEntries, purities, boost_weights)
 
+    def to_tokens(self):
+        yield str(len(self.cuts))
+        yield "\n"
+        for cut in self.cuts:
+            yield from cut.to_tokens()
+            yield "\n"
+        yield from write_vector(self.boost_weights)
+        yield "\n"
+        yield from write_vector(self.purities)
+        yield "\n"
+        yield from write_vector(self.nEntries)
+        yield "\n"
+
 
 @dataclass
 class Forest:
     f0: float
     shrinkage: float
-    transform2probability: list[bool]
+    transform2probability: bool
     trees: list[Tree]
 
     @classmethod
@@ -99,6 +137,19 @@ class Forest:
         for i in range(size):
             trees.append(Tree.from_tokens(tokens, conv))
         return cls(f0, shrinkage, transform2probability, trees)
+
+    def to_tokens(self):
+        yield str(self.f0)
+        yield "\n"
+        yield str(self.shrinkage)
+        yield "\n"
+        yield str(int(self.transform2probability))
+        yield "\n"
+        yield str(len(self.trees))
+        yield "\n"
+        for tree in self.trees:
+            yield from tree.to_tokens()
+            yield "\n"
 
 
 def iter_tokens(f):
@@ -158,3 +209,63 @@ class BDT:
     @classmethod
     def from_string(cls, s):
         return cls.from_tokens(iter(s.split()))
+
+    @classmethod
+    def from_forest(cls, forest):
+        "to read from older files that only contain the forest"
+        n_features = len(
+            set([cut.feature for tree in forest.trees for cut in tree.cuts])
+        )
+        return cls(
+            version=1,
+            n_trees=len(forest.trees),
+            depth=int(math.log2(len(forest.trees[0].cuts) + 1)),
+            binning=[],
+            shrinkage=forest.shrinkage,
+            subsample=1,
+            sPlot=False,
+            flatnessLoss=-1,
+            purityTransformation=[],
+            transform2probability=forest.transform2probability,
+            featureBinning=[],
+            purityBinning=[],
+            numberOfFeatures=n_features,
+            numberOfFinalFeatures=n_features,
+            numberOfFlatnessFeatures=0,
+            can_use_fast_forest=True,
+            forest=forest,
+            binned_forest=forest,
+        )
+
+    def to_tokens(self):
+        # fmt: off
+        yield str(self.version); yield "\n"
+        yield str(self.n_trees); yield "\n"
+        yield str(self.depth); yield "\n"
+        yield from write_vector(self.binning); yield "\n"
+        yield str(self.shrinkage); yield "\n"
+        yield str(self.subsample); yield "\n"
+        yield str(int(self.sPlot)); yield "\n"
+        yield str(self.flatnessLoss); yield "\n"
+        yield from write_vector(self.purityTransformation); yield "\n"
+        yield str(int(self.transform2probability)); yield "\n"
+        yield from write_vector_feature_binning(self.featureBinning); yield "\n"
+        yield from write_vector(self.purityBinning); yield "\n"
+        yield str(self.numberOfFeatures); yield "\n"
+        yield str(self.numberOfFinalFeatures); yield "\n"
+        yield str(self.numberOfFlatnessFeatures); yield "\n"
+        yield str(int(self.can_use_fast_forest)); yield "\n"
+        yield from self.forest.to_tokens(); yield "\n"
+        yield from self.binned_forest.to_tokens(); yield "\n"
+        # fmt: on
+
+    def to_file(self, file):
+        space = False
+        for token in self.to_tokens():
+            if token == "\n":
+                space = False
+            if space:
+                file.write(" ")
+            file.write(token)
+            if token != "\n":
+                space = True

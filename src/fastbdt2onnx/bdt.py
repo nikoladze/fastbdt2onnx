@@ -8,11 +8,12 @@ Mainly following the code from
 - https://github.com/thomaskeck/FastBDT/blob/master/src/FastBDT_IO.cxx
 """
 
+from itertools import chain
 import logging
 import math
 from dataclasses import dataclass
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 
 def next_non_space(tokens):
@@ -178,11 +179,20 @@ class BDT:
     can_use_fast_forest: bool
     forest: Forest
     binned_forest: Forest
+    from_forest: bool
 
     @classmethod
     def from_tokens(cls, tokens):
+        first_token = next(tokens)
+        try:
+            version = int(first_token)
+        except ValueError:
+            logger.info("Couldn't read version - trying to read as forest-only file")
+            forest = Forest.from_tokens(chain([first_token], tokens))
+            logger.info("Successfully read as forest-only file!")
+            return cls.from_forest(forest)
         return cls(
-            version=read(tokens, int),
+            version=version,
             n_trees=read(tokens, int),
             depth=read(tokens, int),
             binning=read_vector(tokens, int),
@@ -200,6 +210,7 @@ class BDT:
             can_use_fast_forest=read(tokens, bool),
             forest=Forest.from_tokens(tokens, float),
             binned_forest=Forest.from_tokens(tokens, int),
+            from_forest=False,
         )
 
     @classmethod
@@ -234,6 +245,7 @@ class BDT:
             can_use_fast_forest=True,
             forest=forest,
             binned_forest=Forest(0, 1, True, []),
+            from_forest=True,
         )
 
     def to_tokens(self):

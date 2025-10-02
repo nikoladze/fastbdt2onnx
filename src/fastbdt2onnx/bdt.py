@@ -213,9 +213,8 @@ class BDT:
     @classmethod
     def from_forest(cls, forest):
         "to read from older files that only contain the forest"
-        n_features = len(
-            set([cut.feature for tree in forest.trees for cut in tree.cuts])
-        )
+        max_index = max([cut.feature for tree in forest.trees for cut in tree.cuts])
+        n_features = max_index + 1
         return cls(
             version=1,
             n_trees=len(forest.trees),
@@ -234,7 +233,7 @@ class BDT:
             numberOfFlatnessFeatures=0,
             can_use_fast_forest=True,
             forest=forest,
-            binned_forest=forest,
+            binned_forest=Forest(0, 1, True, []),
         )
 
     def to_tokens(self):

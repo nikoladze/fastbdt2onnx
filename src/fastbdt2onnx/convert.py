@@ -16,7 +16,7 @@ from onnx.helper import (
 )
 from onnx.onnx_ml_pb2 import ModelProto
 
-from fastbdt2onnx.bdt import BDT
+from fastbdt2onnx.bdt import BDT, Forest, iter_tokens
 
 
 @contextmanager
@@ -253,9 +253,14 @@ def _get_tree_ensemble_attrs(bdt):
     )
 
 
-def convert(file: str | Path | IO | bytes) -> ModelProto:
-    with _read_file(file) as f:
-        bdt = BDT.from_file(f)
+def convert(file: str | Path | IO | bytes, from_forest=False) -> ModelProto:
+    if not from_forest:
+        with _read_file(file) as f:
+            bdt = BDT.from_file(f)
+    else:
+        with _read_file(file) as f:
+            forest = Forest.from_tokens(iter_tokens(f))
+            bdt = BDT.from_forest(forest)
     return _get_onnx_model(
         number_of_inputs=bdt.numberOfFeatures,
         **_get_tree_ensemble_attrs(bdt),
@@ -266,6 +271,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("fastbdt_textfile")
     parser.add_argument("onnx_outputfile")
+    parser.add_argument(
+        "--from-forest",
+        action="store_true",
+        help="Read old FastBDT file with only forest information",
+    )
     args = parser.parse_args()
     model = convert(args.fastbdt_textfile)
     onnx.save(model, args.onnx_outputfile)

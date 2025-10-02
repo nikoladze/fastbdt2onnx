@@ -179,7 +179,7 @@ class BDT:
     can_use_fast_forest: bool
     forest: Forest
     binned_forest: Forest
-    from_forest: bool
+    was_read_from_forest: bool
 
     @classmethod
     def from_tokens(cls, tokens):
@@ -210,7 +210,7 @@ class BDT:
             can_use_fast_forest=read(tokens, bool),
             forest=Forest.from_tokens(tokens, float),
             binned_forest=Forest.from_tokens(tokens, int),
-            from_forest=False,
+            was_read_from_forest=False,
         )
 
     @classmethod
@@ -245,7 +245,7 @@ class BDT:
             can_use_fast_forest=True,
             forest=forest,
             binned_forest=Forest(0, 1, True, []),
-            from_forest=True,
+            was_read_from_forest=True,
         )
 
     def to_tokens(self):

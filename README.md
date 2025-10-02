@@ -26,7 +26,7 @@ onnx.save(model_proto, onnx_outputfile)
 - [X] Classifier with `transform2probability=true` (sigmoid transformation)
 - [ ] Regression (no transformation)
 - [X] Treatment of NaN inputs
-- [ ] Old FastBDT files [that start with forest](https://github.com/belle2/basf2/blob/0ca537f9f535e78c9edc883893d30681ce7a1361/mva/methods/src/FastBDT.cc#L210)
+- [X] Old FastBDT files [that start with forest](https://github.com/belle2/basf2/blob/0ca537f9f535e78c9edc883893d30681ce7a1361/mva/methods/src/FastBDT.cc#L210)
 - [ ] Old FastBDT files [that start with feature binning](https://github.com/belle2/basf2/blob/0ca537f9f535e78c9edc883893d30681ce7a1361/mva/methods/src/FastBDT.cc#L218)
 - [ ] Inference for binned trees (`can_use_fast_forest=false`)
 

@@ -1,6 +1,3 @@
-> **Note**
-> This is in an early stage and currently only tested against one example model - please validate the resulting ONNX models
-
 # Example usage
 Either via command line tool `fastbdt2onnx`, e.g. using [uvx](https://docs.astral.sh/uv/concepts/tools/#the-uv-tool-interface):
 
@@ -45,9 +42,12 @@ uv sync
 
 # Run tests
 
+Run the tests for the example file included in the repository:
 ``` bash
-uv run --group test pytest tests.py
+uv run --group test pytest -k example tests.py
 ```
+
+**Leave out** `-k example` to run **all tests**. This will then test against 475 files from the [Belle II collaboration](https://github.com/belle2), corresponding to all payloads with FastBDT definitions inside from global tags `analysis_tools_light-2505-deimos` and `main_2025-09-08`. When the tests run the first time, the payloads will be downloaded from the Belle II conditions database server with urls specified in [data/urls.txt](data/urls.txt).
 
 # How does it work?
 
